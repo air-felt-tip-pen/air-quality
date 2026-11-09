@@ -2,4 +2,3 @@ https://powietrze.gios.gov.pl/pjp/content/api
 
 https://powietrze.gios.gov.pl/pjp/current
 
-https://powietrze.gios.gov.pl/pjp/current

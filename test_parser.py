@@ -22,11 +22,11 @@ if __name__ == "__main__":
     }
 
     for station_data in gios.show():
-        overall_index = station_data.get_overall_index()
+        overall_index = station_data.get_overall_station_index()
         overall_emoji = INDEX_EMOJI.get(overall_index, "⚪")
         full_status = station_data.get_full_status()
 
-        print(f"\n📍 СТАНЦІЯ ID: {station_data.station_id:<4} | Повіт: {station_data.powiat} | Координати: {station_data.coord}")
+        print(f"\n📍 СТАНЦІЯ ID: {station_data.station_id:<4} | Повіт: {station_data.powiat} | Координати: {station_data.coords}")
         print(f"📊 Загальний індекс повітря: {overall_emoji} [{overall_index.upper()}]")
         print("-" * 75)
 

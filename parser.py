@@ -2,8 +2,13 @@ from abc import ABC, abstractmethod
 import requests
 from copy import deepcopy
 
+from psutil import sensors_battery
+
 
 class Data:
+    """
+    data from station and him sensors
+    """
     _AIR_QUALITY_THRESHOLDS = {
         "PM10": [
             (20.0, "Bardzo dobry"),
@@ -53,60 +58,73 @@ class Data:
 
     def __init__(self, station: dict, sensors: list[dict]):
         """
-        :param station: dict containing station data ('city_id', 'station_id', 'powiat', 'coord')
-        :param sensors: list with dict sensors
+        :param station: dict with station information
+        :param sensors: list with dict sensor information
         """
         self._city_id = station.get("city_id")
         self._station_id = station.get("station_id")
         self._powiat = station.get("powiat")
-        self._coord = station.get("coord")
+        self._coords = station.get("coord")
 
-        self.sensor = {s['Kod']: s for s in sensors if s.get('Kod')}
+        self.sensor = {
+            s['Kod']: s
+            for s in sensors if s.get('Kod') is not None
+        }
 
-    def calculate_pollutant_index(self, code: str, value) -> str:
+
+    def calc_air_quality(self, code: str, value: int | float) -> str:
+        """
+        :param code: Code for substances in the air
+        :param value: Their volume per cubic metre
+        :return: Air quality string or 'No info'
+        """
         if value is None or code not in self._AIR_QUALITY_THRESHOLDS:
-            return "Brak indeksu"
-        for threshold, label in self._AIR_QUALITY_THRESHOLDS[code]:
-            if value <= threshold:
-                return label
-
+            return "No info"
+        for v, name in self._AIR_QUALITY_THRESHOLDS[code]:
+            if value <= v:
+                return name
         return "Bardzo zły"
 
-    def get_pollutant_index(self, code: str) -> str:
+    def get_air_quality(self, code: str) -> str:
+        """
+        :param code: code for substances in the air
+        :return: Air quality string or 'No info'
+        """
         sensor_info = self.sensor.get(code)
         if not sensor_info:
-            return "Brak indeksu"
-        return self.calculate_pollutant_index(code, sensor_info.get("Value"))
+            return "No info"
+        return self.calc_air_quality(code, sensor_info.get("Value"))
 
-    def get_overall_index(self) -> str:
+    def get_overall_station_index(self) -> str:
+        """
+        :return:  Air quality string or 'No info'
+        """
         worst_rank = 0
-        worst_label = "Brak indeksu"
+        worst_label = "No info"
 
         for code in self._AIR_QUALITY_THRESHOLDS.keys():
             if code in self.sensor:
                 val = self.sensor[code].get("Value")
-                label = self.calculate_pollutant_index(code, val)
+                label = self.calc_air_quality(code, val)
 
                 if label in self._INDEX_RANK:
                     rank = self._INDEX_RANK[label]
                     if rank > worst_rank:
                         worst_rank = rank
                         worst_label = label
-
         return worst_label
 
-    def get_full_status(self) -> dict:
-        individual = {}
+    def get_full_status(self):
+        individual = dict()
         for code, data in self.sensor.items():
             individual[code] = {
                 "name": data.get("Name"),
                 "value": data.get("Value"),
-                "index": self.calculate_pollutant_index(code, data.get("Value"))
+                "index": self.calc_air_quality(code, data.get("Value"))
             }
-
         return {
-            "overall_index": self.get_overall_index(),
-            "sensors": individual
+            'overall_index': self.get_overall_station_index(),
+            'sensors': individual
         }
 
     @property
@@ -122,34 +140,13 @@ class Data:
         return self._powiat
 
     @property
-    def coord(self):
-        return self._coord
-
-    def get_value(self, code: str) -> dict | None:
-        """
-        :param code: Pollutant code (e.g. 'PM10', 'NO2', 'O3')
-        :return: dict with sensor ('Name', 'Kod', 'Value', 'Data') or None if not found
-        """
-        return self.sensor.get(code)
-
-    def has_pollutant(self, code: str) -> bool:
-        """
-        Checks if a sensor for the given pollutant code exists on the station.
-        :param code: Pollutant code (e.g. 'PM10', 'O3')
-        :return: True if sensor exists, False otherwise
-        """
-        return code in self.sensor
-
-    def __eq__(self, other):
-        if isinstance(other, Data):
-            if self.city_id == other.city_id and self.station_id == other.station_id:
-                return True
-        return False
+    def coords(self):
+        return self._coords
 
     def __str__(self) -> str:
-        return f"{self.city_id} {self.station_id} {self.powiat} {self.coord} {self.sensor.keys()} {self.sensor}"
+        return f"{self.city_id} {self._station_id} {self._powiat} {self.sensor.keys()}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()
 
 
@@ -223,6 +220,9 @@ class StationsParser(BaseParser):
     @property
     def stations(self) -> list[dict]:
         return deepcopy(self._stations)
+
+
+
 
 
 class SensorParser(BaseParser):
@@ -305,6 +305,7 @@ class GiosParser:
 
         self._data = result
         return self._data
+
 
     def show(self) -> list[Data]:
         """
