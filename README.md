@@ -44,6 +44,5 @@ GiosParser - Поєднання всіх класів вище крім BasePars
 
 
 
-
 ### Теги завдань:
 https://trello.com/b/C1yehgVn
