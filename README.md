@@ -3,7 +3,7 @@
 
 ## Вимоги до проекта 
 
-![wymagania.png](wymagania.png)
+![wymagania.png](docs/wymagania.png)
 
 ## Корисні посилання 
 
