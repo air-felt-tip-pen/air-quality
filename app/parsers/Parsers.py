@@ -137,6 +137,19 @@ class SensorParser(BaseParser):
 class IndexParser(BaseParser):
     _POLLUTANTS = ("PM10", "PM2.5", "O3", "NO2", "SO2")
 
+
+    @staticmethod
+    def _get_pollutant_index(raw_index: dict[str, str], code: str) -> str:
+        keys = (
+            f"Nazwa kategorii indeksu dla wskaźnika {code}"
+            f"Nazwa kategorii indeksu dla wskażnika {code}"
+        )
+        for key in keys:
+            value = raw_index.get(key)
+            if value:
+                return value
+        return "Brak indeksu"
+
     async def fetch(self, session: aiohttp.ClientSession, station_id: str | int) -> dict:
         data = await self._make_request(session, f"/aqindex/getIndex/{station_id}")
         if not isinstance(data, dict):
@@ -145,7 +158,7 @@ class IndexParser(BaseParser):
         raw_index = data.get("AqIndex") or data
 
         pollutants = {
-            code: raw_index.get(f"Nazwa kategorii indeksu dla wskaźnika {code}") or "Brak indeksu"
+            code: self._get_pollutant_index(raw_index, code)
             for code in self._POLLUTANTS
         }
 
