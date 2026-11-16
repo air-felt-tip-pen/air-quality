@@ -1,13 +1,20 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy
 import asyncio
 import aiohttp
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from contextlib import nullcontext
 
+
 class BaseParser(ABC):
+    """
+    Base class for all API parsers.
+    """
+
     def __init__(self, url: str = ""):
+        """
+        :param url: base API link
+        """
         if not isinstance(url, str):
             raise TypeError("Url must be a string")
         if url and not url.startswith("https://"):
@@ -22,6 +29,14 @@ class BaseParser(ABC):
             timeout: int = 15,
             semaphore: asyncio.Semaphore | None = None
     ) -> dict | None:
+        """
+        Send a GET request to the API and return JSON.
+        :param session: active web session
+        :param endpoint: API path
+        :param timeout: max wait time in seconds
+        :param semaphore: limit for parallel requests
+        :return: JSON dict or None if error
+        """
         url = f"{self._URL}/{endpoint.lstrip('/')}"
         limiter = semaphore if semaphore is not None else nullcontext()
         async with limiter:
@@ -34,17 +49,33 @@ class BaseParser(ABC):
 
     @property
     def url(self) -> str:
+        """
+        Get base API link.
+        """
         return self._URL
 
     @abstractmethod
     async def fetch(self, session: aiohttp.ClientSession, *args, **kwargs):
+        """
+        Abstract method to download data from API.
+        """
         pass
 
 
 
 class StationsParser(BaseParser):
+    """
+    Parser for getting the list of all stations.
+    """
+
     @staticmethod
     def _parse_coords(lat_raw, lon_raw) -> dict[str, float] | None:
+        """
+        Convert raw coordinates to numbers.
+        :param lat_raw: latitude as text or number
+        :param lon_raw: longitude as text or number
+        :return: dict with lat and lon or None
+        """
         if lat_raw is None or lon_raw is None:
             return None
         try:
@@ -53,6 +84,12 @@ class StationsParser(BaseParser):
             return None
 
     async def fetch(self, session: aiohttp.ClientSession, semaphore: asyncio.Semaphore | None = None) -> list[dict]:
+        """
+        Download all stations from API page by page.
+        :param session: active web session
+        :param semaphore: limit for parallel requests
+        :return: list of dicts with station info
+        """
         all_raw_stations = []
         page = 0
         size = 500
@@ -89,12 +126,22 @@ class StationsParser(BaseParser):
             for i in all_raw_stations
         ]
 
+
 class SensorParser(BaseParser):
+    """
+    Parser for getting sensors and their values for a station.
+    """
 
     _WARSAW_TIMEZONE = ZoneInfo('Europe/Warsaw')
 
     @classmethod
     def _is_data_stale(cls, date_str: str | None, max_age_hours: int = 3) -> bool:
+        """
+        Check if measurement date is too old.
+        :param date_str: date and time as string
+        :param max_age_hours: max hours before data is old
+        :return: True if old, False if fresh
+        """
         if not date_str:
             return True
         try:
@@ -105,6 +152,13 @@ class SensorParser(BaseParser):
             return True
 
     async def _fetch_single_sensor(self, session: aiohttp.ClientSession, sensor_meta: dict, semaphore: asyncio.Semaphore | None = None) -> dict:
+        """
+        Download the latest value for one sensor.
+        :param session: active web session
+        :param sensor_meta: dict with basic sensor info
+        :param semaphore: limit for parallel requests
+        :return: dict with sensor info and latest value
+        """
         sensor_id = sensor_meta.get("Identyfikator stanowiska")
         data = await self._make_request(session, f"/data/getData/{sensor_id}", semaphore=semaphore)
 
@@ -126,6 +180,13 @@ class SensorParser(BaseParser):
         }
 
     async def fetch(self, session: aiohttp.ClientSession, station_id: str | int, semaphore: asyncio.Semaphore | None = None) -> list[dict]:
+        """
+        Download all sensors and their values for one station.
+        :param session: active web session
+        :param station_id: ID of the station
+        :param semaphore: limit for parallel requests
+        :return: list of dicts with sensor data
+        """
         data = await self._make_request(session, f"/station/sensors/{station_id}", semaphore=semaphore)
         if not data:
             return []
@@ -137,11 +198,20 @@ class SensorParser(BaseParser):
 
 
 class IndexParser(BaseParser):
+    """
+    Parser for getting air quality index for a station.
+    """
     _POLLUTANTS = ("PM10", "PM2.5", "O3", "NO2", "SO2")
 
 
     @staticmethod
     def _get_pollutant_index(raw_index: dict[str, str], code: str) -> str:
+        """
+        Find index name for one pollutant in API data.
+        :param raw_index: dict from API with index info
+        :param code: pollutant code (like 'PM10' or 'O3')
+        :return: index name or 'Brak indeksu'
+        """
         keys = (
             f"Nazwa kategorii indeksu dla wskaźnika {code}",
             f"Nazwa kategorii indeksu dla wskażnika {code}"
@@ -153,6 +223,13 @@ class IndexParser(BaseParser):
         return "Brak indeksu"
 
     async def fetch(self, session: aiohttp.ClientSession, station_id: str | int, semaphore: asyncio.Semaphore | None = None) -> dict:
+        """
+        Download air quality index for one station.
+        :param session: active web session
+        :param station_id: ID of the station
+        :param semaphore: limit for parallel requests
+        :return: dict with overall index, date, and pollutant indices
+        """
         data = await self._make_request(session, f"/aqindex/getIndex/{station_id}", semaphore=semaphore)
         if not isinstance(data, dict):
             return {"overall_index": "Brak indeksu", "calc_date": None, "pollutants": {}}

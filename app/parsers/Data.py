@@ -1,4 +1,7 @@
 class Data:
+    """
+    Class for station data, its sensors, and air quality index.
+    """
     _INDEX_RANK = {
         "Bardzo dobry": 1,
         "Dobry": 2,
@@ -12,6 +15,11 @@ class Data:
 
 
     def __init__(self, station: dict, sensors: list[dict], aq_index: dict | None = None):
+        """
+        :param station: dict with station info
+        :param sensors: list of dicts with sensor info
+        :param aq_index: dict with air quality index
+        """
         self._city_id = station.get("city_id")
         self._station_id = station.get("station_id")
         self._station_name = station.get("station_name")
@@ -28,10 +36,18 @@ class Data:
 
     @property
     def overall_station_index(self) -> str:
+        """
+        Get the main air quality index for the station.
+        :return: index name as string
+        """
         return self._aq_index.get("overall_index") or "Brak indeksu"
 
 
     def to_dict(self) -> dict:
+        """
+        Convert all station and sensor data to a dictionary.
+        :return: dict with all data
+        """
         pollutant_indices = self._aq_index.get("pollutants", {})
         individual = {}
 
@@ -68,32 +84,57 @@ class Data:
 
     @property
     def city_id(self):
+        """
+        Get city ID.
+        """
         return self._city_id
 
     @property
     def station_id(self):
+        """
+        Get station ID.
+        """
         return self._station_id
 
     @property
     def station_name(self):
+        """
+        Get station name.
+        """
         return self._station_name
 
     @property
     def powiat(self):
+        """
+        Get powiat (district) name.
+        """
         return self._powiat
 
     @property
     def wojewodztwo(self):
+        """
+        Get voivodeship (region) name.
+        """
         return self._wojewodztwo
 
     @property
     def coords(self) -> dict[str, float] | None:
+        """
+        Get station coordinates.
+        :return: dict with coordinates or None
+        """
         return self._coords
 
     def __str__(self) -> str:
+        """
+        Return station info as text.
+        """
         return (
             f"{self._wojewodztwo} {self._powiat} {self._station_id} ({self._station_name}): {self.overall_station_index}"
         )
 
     def __repr__(self) -> str:
+        """
+        Return text representation of the object.
+        """
         return self.__str__()
