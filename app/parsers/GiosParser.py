@@ -23,9 +23,10 @@ class GiosParser:
             all_stations = await self._station_parser.fetch(session)
 
             if wojewodztwo:
+                target = wojewodztwo.strip().casefold()
                 all_stations = [
                     st for st in all_stations
-                    if wojewodztwo.lower() in st["wojewodztwo"].lower()
+                    if st["wojewodztwo"].casefold() == target
                 ]
 
             grouped: dict[str, list[dict]] = {}
@@ -35,15 +36,21 @@ class GiosParser:
                     grouped[woj] = []
                 grouped[woj].append(st)
 
+            result: dict[str, list[Data]] = {}
             for woj, stations_in_woj in grouped.items():
                 tasks = [self._fetch_station_data(session, st) for st in stations_in_woj]
-                self._data[woj] = list(await asyncio.gather(*tasks))
+                result[woj] = list(await asyncio.gather(*tasks))
 
+        self._data = result
         return self.get_data()
 
     def fetch_voivodeship(self, wojewodztwo: str) -> list[Data]:
         data = asyncio.run(self._fetch_async(wojewodztwo=wojewodztwo))
-        return next(iter(data.values()), [])
+        target = wojewodztwo.strip().casefold()
+        for woj, stations in data.items():
+            if woj.casefold() == target:
+                return stations
+        return []
 
     def fetch_all(self) -> dict[str, list[Data]]:
         return asyncio.run(self._fetch_async())
