@@ -4,25 +4,27 @@ import asyncio
 import aiohttp
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from contextlib import nullcontext
 
 class BaseParser(ABC):
-    def __init__(self, url: str = "", max_concurrent: int = 10):
+    def __init__(self, url: str = ""):
         if not isinstance(url, str):
             raise TypeError("Url must be a string")
         if url and not url.startswith("https://"):
             raise ValueError("Url must start with 'https://'")
 
         self._URL = (url or "https://api.gios.gov.pl/pjp-api/v1/rest").rstrip("/")
-        self._semaphore = asyncio.Semaphore(max_concurrent)
 
     async def _make_request(
             self,
             session: aiohttp.ClientSession,
             endpoint: str,
-            timeout: int = 15
+            timeout: int = 15,
+            semaphore: asyncio.Semaphore | None = None
     ) -> dict | None:
         url = f"{self._URL}/{endpoint.lstrip('/')}"
-        async with self._semaphore:
+        limiter = semaphore if semaphore is not None else nullcontext()
+        async with limiter:
             try:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
                     response.raise_for_status()
@@ -35,7 +37,7 @@ class BaseParser(ABC):
         return self._URL
 
     @abstractmethod
-    async def fetch(self, session: aiohttp.ClientSession):
+    async def fetch(self, session: aiohttp.ClientSession, *args, **kwargs):
         pass
 
 
@@ -50,12 +52,12 @@ class StationsParser(BaseParser):
         except (ValueError, TypeError):
             return None
 
-    async def fetch(self, session: aiohttp.ClientSession) -> list[dict]:
+    async def fetch(self, session: aiohttp.ClientSession, semaphore: asyncio.Semaphore | None = None) -> list[dict]:
         all_raw_stations = []
         page = 0
         size = 500
         while True:
-            data = await self._make_request(session, f"/station/findAll?page={page}&size={size}")
+            data = await self._make_request(session, f"/station/findAll?page={page}&size={size}", semaphore=semaphore)
             if not data:
                 if page == 0:
                     raise ConnectionError("Failed to fetch stations from GIOŚ API")
@@ -102,9 +104,9 @@ class SensorParser(BaseParser):
         except ValueError:
             return True
 
-    async def _fetch_single_sensor(self, session: aiohttp.ClientSession, sensor_meta: dict) -> dict:
+    async def _fetch_single_sensor(self, session: aiohttp.ClientSession, sensor_meta: dict, semaphore: asyncio.Semaphore | None = None) -> dict:
         sensor_id = sensor_meta.get("Identyfikator stanowiska")
-        data = await self._make_request(session, f"/data/getData/{sensor_id}")
+        data = await self._make_request(session, f"/data/getData/{sensor_id}", semaphore=semaphore)
 
         latest = None
         if data:
@@ -123,13 +125,13 @@ class SensorParser(BaseParser):
             "is_stale": self._is_data_stale(date_str),
         }
 
-    async def fetch(self, session: aiohttp.ClientSession, station_id: str | int) -> list[dict]:
-        data = await self._make_request(session, f"/station/sensors/{station_id}")
+    async def fetch(self, session: aiohttp.ClientSession, station_id: str | int, semaphore: asyncio.Semaphore | None = None) -> list[dict]:
+        data = await self._make_request(session, f"/station/sensors/{station_id}", semaphore=semaphore)
         if not data:
             return []
 
         sensors = data.get("Lista stanowisk pomiarowych dla podanej stacji", [])
-        tasks = [self._fetch_single_sensor(session, s) for s in sensors]
+        tasks = [self._fetch_single_sensor(session, s, semaphore=semaphore) for s in sensors]
         return list(await asyncio.gather(*tasks))
 
 
@@ -141,7 +143,7 @@ class IndexParser(BaseParser):
     @staticmethod
     def _get_pollutant_index(raw_index: dict[str, str], code: str) -> str:
         keys = (
-            f"Nazwa kategorii indeksu dla wskaźnika {code}"
+            f"Nazwa kategorii indeksu dla wskaźnika {code}",
             f"Nazwa kategorii indeksu dla wskażnika {code}"
         )
         for key in keys:
@@ -150,8 +152,8 @@ class IndexParser(BaseParser):
                 return value
         return "Brak indeksu"
 
-    async def fetch(self, session: aiohttp.ClientSession, station_id: str | int) -> dict:
-        data = await self._make_request(session, f"/aqindex/getIndex/{station_id}")
+    async def fetch(self, session: aiohttp.ClientSession, station_id: str | int, semaphore: asyncio.Semaphore | None = None) -> dict:
+        data = await self._make_request(session, f"/aqindex/getIndex/{station_id}", semaphore=semaphore)
         if not isinstance(data, dict):
             return {"overall_index": "Brak indeksu", "calc_date": None, "pollutants": {}}
 

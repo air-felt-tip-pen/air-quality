@@ -32,6 +32,7 @@ def main():
 
     total_time = perf_counter() - start
     print(f"Done! Total execution time: {total_time:.2f}s")
+    pprint(parser.fetch_voivodeship("LUBELSKIE"))
 
 
 if __name__ == "__main__":

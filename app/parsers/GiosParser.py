@@ -6,21 +6,24 @@ import aiohttp
 
 class GiosParser:
     def __init__(self, url: str = "", max_concurrent: int = 10):
-        self._station_parser = StationsParser(url, max_concurrent)
-        self._sensor_parser = SensorParser(url, max_concurrent)
-        self._index_parser = IndexParser(url, max_concurrent)
+        self.max_concurrent = max_concurrent
+        self._station_parser = StationsParser(url)
+        self._sensor_parser = SensorParser(url)
+        self._index_parser = IndexParser(url)
         self._data: dict[str, list[Data]] = {}
 
-    async def _fetch_station_data(self, session: aiohttp.ClientSession, station: dict) -> Data:
+    async def _fetch_station_data(self, session: aiohttp.ClientSession, station: dict, semaphore: asyncio.Semaphore) -> Data:
         sensors, aq_index = await asyncio.gather(
-            self._sensor_parser.fetch(session, station["station_id"]),
-            self._index_parser.fetch(session, station["station_id"]),
+            self._sensor_parser.fetch(session, station["station_id"], semaphore=semaphore),
+            self._index_parser.fetch(session, station["station_id"], semaphore=semaphore)
         )
         return Data(station, sensors, aq_index)
 
     async def _fetch_async(self, wojewodztwo: str | None = None) -> dict[str, list[Data]]:
+        semaphore = asyncio.Semaphore(self.max_concurrent)
+
         async with aiohttp.ClientSession() as session:
-            all_stations = await self._station_parser.fetch(session)
+            all_stations = await self._station_parser.fetch(session, semaphore=semaphore)
 
             if wojewodztwo:
                 target = wojewodztwo.strip().casefold()
@@ -38,7 +41,7 @@ class GiosParser:
 
             result: dict[str, list[Data]] = {}
             for woj, stations_in_woj in grouped.items():
-                tasks = [self._fetch_station_data(session, st) for st in stations_in_woj]
+                tasks = [self._fetch_station_data(session, st, semaphore=semaphore) for st in stations_in_woj]
                 result[woj] = list(await asyncio.gather(*tasks))
 
         if wojewodztwo is None:
