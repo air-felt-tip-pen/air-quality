@@ -41,7 +41,11 @@ class GiosParser:
                 tasks = [self._fetch_station_data(session, st) for st in stations_in_woj]
                 result[woj] = list(await asyncio.gather(*tasks))
 
-        self._data = result
+        if wojewodztwo is None:
+            self._data = result
+        else:
+            self._data.update(result)
+
         return self.get_data()
 
     def fetch_voivodeship(self, wojewodztwo: str) -> list[Data]:
