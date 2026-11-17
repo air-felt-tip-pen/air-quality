@@ -21,13 +21,13 @@ def main():
     print("\n\n")
 
     print(f"Start dumping to JSON...")
-    with open("data.json", "w", encoding="utf-8") as outfile:
+    with open("data/data.json", "w", encoding="utf-8") as outfile:
         json.dump(
             data,
             outfile,
             indent=4,
             ensure_ascii=False,
-            default=lambda obj: obj.__dict__,
+            default=lambda obj: obj.to_dict(),
         )
 
     total_time = perf_counter() - start
