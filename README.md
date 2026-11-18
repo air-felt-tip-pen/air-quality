@@ -21,6 +21,38 @@ https://powietrze.gios.gov.pl/pjp/current!
 
 
 ## Файли
+
+### Структура проєкту
+
+```text
+D:.
+|   .gitignore
+|   README.md
+|            
++---app
+|   |   app.py
+|   |   __init__.py
+|   |   
+|   +---data
+|   |       .gitkeep
+|   |       data.json
+|   |       
+|   +---normalizers
+|   |       DataNormalizer.py
+|   |       __init__.py
+|   |       
+|   \---parsers
+|       |   Data.py
+|       |   GiosParser.py
+|       |   Parsers.py
+|       |   __init__.py
+|               
++---docs
+|       wymagania.png
+
+PS: tree /f /a
+```
+
 Асинхронний парсер розділений на модулі в директорії `app/parsers/` та містить такі файли і класи:
 
 ### `Data.py`
