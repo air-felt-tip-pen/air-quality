@@ -83,7 +83,7 @@ class StationsParser(BaseParser):
         except (ValueError, TypeError):
             return None
 
-    async def fetch(self, session: aiohttp.ClientSession, semaphore: asyncio.Semaphore | None = None) -> list[dict]:
+    async def fetch(self, session: aiohttp.ClientSession, semaphore: asyncio.Semaphore | None = None, *args, **kwargs) -> list[dict]:
         """
         Download all stations from API page by page.
         :param session: active web session
@@ -106,7 +106,7 @@ class StationsParser(BaseParser):
 
             all_raw_stations.extend(raw_stations)
 
-            total_pages = data.get("totalPages")
+            total_pages: None | int = data.get("totalPages")
             if total_pages is not None and page + 1 >= total_pages:
                 break
             if len(raw_stations) < size:
@@ -179,7 +179,7 @@ class SensorParser(BaseParser):
             "is_stale": self._is_data_stale(date_str),
         }
 
-    async def fetch(self, session: aiohttp.ClientSession, station_id: str | int, semaphore: asyncio.Semaphore | None = None) -> list[dict]:
+    async def fetch(self, session: aiohttp.ClientSession, station_id: str | int | None = None, semaphore: asyncio.Semaphore | None = None, *args, **kwargs) -> list[dict]:
         """
         Download all sensors and their values for one station.
         :param session: active web session
@@ -187,6 +187,9 @@ class SensorParser(BaseParser):
         :param semaphore: limit for parallel requests
         :return: list of dicts with sensor data
         """
+        if station_id is None:
+            raise ValueError("station_id is required")
+
         data = await self._make_request(session, f"/station/sensors/{station_id}", semaphore=semaphore)
         if not data:
             return []
@@ -222,7 +225,7 @@ class IndexParser(BaseParser):
                 return value
         return "Brak indeksu"
 
-    async def fetch(self, session: aiohttp.ClientSession, station_id: str | int, semaphore: asyncio.Semaphore | None = None) -> dict:
+    async def fetch(self, session: aiohttp.ClientSession, station_id: str | int | None = None, semaphore: asyncio.Semaphore | None = None, *args, **kwargs) -> dict:
         """
         Download air quality index for one station.
         :param session: active web session
@@ -230,6 +233,9 @@ class IndexParser(BaseParser):
         :param semaphore: limit for parallel requests
         :return: dict with overall index, date, and pollutant indices
         """
+        if station_id is None:
+            raise ValueError("station_id is required")
+
         data = await self._make_request(session, f"/aqindex/getIndex/{station_id}", semaphore=semaphore)
         if not isinstance(data, dict):
             return {"overall_index": "Brak indeksu", "calc_date": None, "pollutants": {}}
