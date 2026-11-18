@@ -1,6 +1,7 @@
 import json
 from time import perf_counter
 from parsers.GiosParser import GiosParser
+from normalizers.DataNormalizer import DataNormalizer
 from pprint import pprint
 
 def main():
@@ -20,14 +21,16 @@ def main():
     pprint(data["LUBELSKIE"][0].sensor)
     print("\n\n")
 
+    normalizer = DataNormalizer()
+    clean_data = normalizer.clean(data)
+
     print(f"Start dumping to JSON...")
-    with open("data/data.json", "w", encoding="utf-8") as outfile:
+    with open("app/data/data.json", "w", encoding="utf-8") as outfile:
         json.dump(
-            data,
+            clean_data,
             outfile,
             indent=4,
-            ensure_ascii=False,
-            default=lambda obj: obj.to_dict(),
+            ensure_ascii=False
         )
 
     total_time = perf_counter() - start
