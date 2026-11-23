@@ -25,13 +25,22 @@ def main():
     clean_data = normalizer.clean(data)
 
     print(f"Start dumping to JSON...")
-    with open("app/data/data.json", "w", encoding="utf-8") as outfile:
-        json.dump(
-            clean_data,
-            outfile,
-            indent=4,
-            ensure_ascii=False
-        )
+    try:
+        with open("data/data.json", "w", encoding="utf-8") as outfile:
+            json.dump(
+                clean_data,
+                outfile,
+                indent=4,
+                ensure_ascii=False
+            )
+    except:
+        with open("app/data/data.json", "w", encoding="utf-8") as outfile:
+            json.dump(
+                clean_data,
+                outfile,
+                indent=4,
+                ensure_ascii=False
+            )
 
     total_time = perf_counter() - start
     print(f"Done! Total execution time: {total_time:.2f}s")
